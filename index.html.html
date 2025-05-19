@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>点の鏡像表示と保存（修正機能つき）</title>
+  <style>
+    body { text-align: center; font-family: sans-serif; margin: 0; padding: 0; }
+    .canvas-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 30px;
+      margin: 20px;
+    }
+    canvas {
+      border: 2px solid black;
+      touch-action: none;
+    }
+    button {
+      margin: 8px;
+      font-size: 16px;
+      padding: 6px 12px;
+    }
+    p { margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h2>点をタップ → 修正・鏡像表示・保存</h2>
+  <div class="canvas-wrapper">
+    <div>
+      <p>元の画面</p>
+      <canvas id="canvasOriginal" width="300" height="300"></canvas><br>
+      <button onclick="saveImage('canvasOriginal')">保存</button>
+    </div>
+    <div>
+      <p>鏡像（左右反転）</p>
+      <canvas id="canvasFlipped" width="300" height="300"></canvas><br>
+      <button onclick="saveImage('canvasFlipped')">保存</button>
+    </div>
+  </div>
+
+  <script>
+    const canvasOriginal = document.getElementById('canvasOriginal');
+    const canvasFlipped = document.getElementById('canvasFlipped');
+    const ctxOriginal = canvasOriginal.getContext('2d');
+    const ctxFlipped = canvasFlipped.getContext('2d');
+    const CANVAS_WIDTH = canvasOriginal.width;
+    const CANVAS_HEIGHT = canvasOriginal.height;
+
+    let points = [];
+    let selectedPointIndex = -1;
+
+    function drawPoints(ctx, flip = false) {
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      for (let i = 0; i < points.length; i++) {
+        const p = points[i];
+        const x = flip ? CANVAS_WIDTH - p.x : p.x;
+        const y = p.y;
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = (i === selectedPointIndex) ? 'blue' : 'red';
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.font = '14px sans-serif';
+        ctx.fillText((i + 1).toString(), x + 6, y - 6);
+      }
+    }
+
+    function redrawAll() {
+      drawPoints(ctxOriginal, false);
+      drawPoints(ctxFlipped, true);
+    }
+
+    function getEventPosition(e, canvas) {
+      const rect = canvas.getBoundingClientRect();
+      if (e.touches) {
+        return {
+          x: e.touches[0].clientX - rect.left,
+          y: e.touches[0].clientY - rect.top
+        };
+      } else {
+        return {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+        };
+      }
+    }
+
+    function findNearestPoint(x, y) {
+      const threshold = 10; // ピクセル範囲でヒット判定
+      for (let i = 0; i < points.length; i++) {
+        const dx = points[i].x - x;
+        const dy = points[i].y - y;
+        if (Math.sqrt(dx * dx + dy * dy) < threshold) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    function handleInputEvent(e) {
+      e.preventDefault(); // スクロール防止
+      const pos = getEventPosition(e, canvasOriginal);
+
+      if (pos.x < 0 || pos.x > CANVAS_WIDTH || pos.y < 0 || pos.y > CANVAS_HEIGHT) return;
+
+      if (selectedPointIndex === -1) {
+        // 点を選択するモード
+        const idx = findNearestPoint(pos.x, pos.y);
+        if (idx !== -1) {
+          selectedPointIndex = idx;
+          redrawAll();
+        } else {
+          // 新規点を追加
+          points.push({ x: pos.x, y: pos.y });
+          redrawAll();
+        }
+      } else {
+        // 選択中の点を移動
+        points[selectedPointIndex] = { x: pos.x, y: pos.y };
+        selectedPointIndex = -1;
+        redrawAll();
+      }
+    }
+
+    canvasOriginal.addEventListener('click', handleInputEvent);
+    canvasOriginal.addEventListener('touchstart', handleInputEvent);
+
+    function saveImage(canvasId) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.download = canvasId + '.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+  </script>
+</body>
+</html>
